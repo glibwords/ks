@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minesweeper</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f2f2f2;color:#111;text-align:center;margin:8px}
+h1{font-size:22px;margin:8px 0}
+button{font-size:16px;padding:8px 10px;margin:3px}
+#info{font-size:16px;margin:8px 0}
+table{border-collapse:collapse;margin:10px auto;touch-action:manipulation}
+td{padding:0}
+.cell{
+  width:30px;height:30px;
+  font-size:18px;font-weight:bold;
+  line-height:28px;
+  border:2px outset #cfcfcf;
+  background:#cfcfcf;
+}
+.open{border:1px solid #aaa;background:#ececec}
+.flag{color:#b00}
+.n1{color:#0000ff}
+.n2{color:#008000}
+.n3{color:#ff0000}
+.n4{color:#000080}
+.n5{color:#800000}
+.n6{color:#008080}
+.n7{color:#000000}
+.n8{color:#666666}
+</style>
+</head>
+<body>
+<h1>Minesweeper</h1>
+
+<div>
+  <button onclick="newGame(9,9,10)">Easy</button>
+  <button onclick="newGame(16,16,40)">Medium</button>
+  <button onclick="newGame(16,30,99)">Hard</button>
+</div>
+
+<div>
+  <button onclick="newGame(rows,cols,mines)">Restart</button>
+  <button id="modeBtn" onclick="toggleMode()">Mode: Reveal</button>
+</div>
+
+<div id="info">Mines: 10 | Time: 0</div>
+<table id="board"></table>
+
+<script>
+var rows = 9;
+var cols = 9;
+var mines = 10;
+var grid = [];
+var started = false;
+var gameOver = false;
+var flags = 0;
+var time = 0;
+var timer = null;
+var mode = "reveal";
+
+function newGame(r, c, m) {
+  rows = r;
+  cols = c;
+  mines = m;
+  grid = [];
+  started = false;
+  gameOver = false;
+  flags = 0;
+  time = 0;
+  mode = "reveal";
+
+  if (timer !== null) {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  document.getElementById("modeBtn").innerHTML = "Mode: Reveal";
+
+  for (var y = 0; y < rows; y++) {
+    grid[y] = [];
+    for (var x = 0; x < cols; x++) {
+      grid[y][x] = {
+        mine: false,
+        open: false,
+        flag: false,
+        n: 0
+      };
+    }
+  }
+
+  drawBoard();
+  updateInfo();
+}
+
+function drawBoard() {
+  var board = document.getElementById("board");
+  var html = "";
+
+  for (var y = 0; y < rows; y++) {
+    html += "<tr>";
+    for (var x = 0; x < cols; x++) {
+      var c = grid[y][x];
+      var label = "";
+      var cls = "cell";
+
+      if (c.open) {
+        cls += " open";
+        if (c.mine) {
+          label = "*";
+        } else if (c.n > 0) {
+          label = String(c.n);
+          cls += " n" + c.n;
+        }
+      } else {
+        if (c.flag) {
+          label = "F";
+          cls += " flag";
+        }
+      }
+
+      html += '<td><button class="' + cls + '" onclick="clickCell(' + x + ',' + y + ')">' + label + "</button></td>";
+    }
+    html += "</tr>";
+  }
+
+  board.innerHTML = html;
+}
+
+function placeMines(sx, sy) {
+  var safe = [];
+  for (var y = 0; y < rows; y++) {
+    for (var x = 0; x < cols; x++) {
+      if (Math.abs(x - sx) <= 1 && Math.abs(y - sy) <= 1) {
+        continue;
+      }
+      safe.push([x, y]);
+    }
+  }
+
+  for (var i = safe.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = safe[i];
+    safe[i] = safe[j];
+    safe[j] = temp;
+  }
+
+  for (var k = 0; k < mines; k++) {
+    var pos = safe[k];
+    grid[pos[1]][pos[0]].mine = true;
+  }
+
+  for (var yy = 0; yy < rows; yy++) {
+    for (var xx = 0; xx < cols; xx++) {
+      var count = 0;
+      for (var dy = -1; dy <= 1; dy++) {
+        for (var dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          var ny = yy + dy;
+          var nx = xx + dx;
+          if (ny >= 0 && ny < rows && nx >= 0 && nx < cols && grid[ny][nx].mine) {
+            count++;
+          }
+        }
+      }
+      grid[yy][xx].n = count;
+    }
+  }
+}
+
+function clickCell(x, y) {
+  if (gameOver) return;
+
+  var c = grid[y][x];
+
+  if (mode === "flag") {
+    toggleFlag(x, y);
+    return;
+  }
+
+  if (c.open || c.flag) return;
+
+  if (!started) {
+    placeMines(x, y);
+    started = true;
+    timer = setInterval(function () {
+      time++;
+      updateInfo();
+    }, 1000);
+  }
+
+  if (c.mine) {
+    c.open = true;
+    gameOver = true;
+    if (timer !== null) clearInterval(timer);
+    revealAllMines();
+    drawBoard();
+    updateInfo();
+    setTimeout(function () { alert("Boom!"); }, 10);
+    return;
+  }
+
+  floodReveal(x, y);
+  drawBoard();
+  updateInfo();
+
+  if (checkWin()) {
+    gameOver = true;
+    if (timer !== null) clearInterval(timer);
+    setTimeout(function () { alert("You win! Time: " + time + " seconds"); }, 10);
+  }
+}
+
+function floodReveal(x, y) {
+  var stack = [[x, y]];
+
+  while (stack.length > 0) {
+    var p = stack.pop();
+    var cx = p[0];
+    var cy = p[1];
+    var c = grid[cy][cx];
+
+    if (c.open || c.flag || c.mine) continue;
+
+    c.open = true;
+
+    if (c.n === 0) {
+      for (var dy = -1; dy <= 1; dy++) {
+        for (var dx = -1; dx <= 1; dx++) {
+          var nx = cx + dx;
+          var ny = cy + dy;
+          if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
+            if (!grid[ny][nx].open) {
+              stack.push([nx, ny]);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function toggleFlag(x, y) {
+  var c = grid[y][x];
+  if (c.open) return;
+
+  if (c.flag) {
+    c.flag = false;
+    flags--;
+  } else if (flags < mines) {
+    c.flag = true;
+    flags++;
+  }
+
+  drawBoard();
+  updateInfo();
+}
+
+function toggleMode() {
+  if (mode === "reveal") {
+    mode = "flag";
+    document.getElementById("modeBtn").innerHTML = "Mode: Flag";
+  } else {
+    mode = "reveal";
+    document.getElementById("modeBtn").innerHTML = "Mode: Reveal";
+  }
+}
+
+function revealAllMines() {
+  for (var y = 0; y < rows; y++) {
+    for (var x = 0; x < cols; x++) {
+      if (grid[y][x].mine) {
+        grid[y][x].open = true;
+      }
+    }
+  }
+}
+
+function checkWin() {
+  for (var y = 0; y < rows; y++) {
+    for (var x = 0; x < cols; x++) {
+      if (!grid[y][x].mine && !grid[y][x].open) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function updateInfo() {
+  document.getElementById("info").innerHTML = "Mines: " + (mines - flags) + " | Time: " + time;
+}
+
+newGame(9,9,10);
+</script>
+</body>
+</html>
