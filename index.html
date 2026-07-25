@@ -1,304 +1,272 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Minesweeper Check</title>
-<style>
-body{font-family:Arial,sans-serif;background:#f2f2f2;color:#111;text-align:center;margin:8px}
-h1{font-size:22px;margin:8px 0}
-#status{font-size:18px;margin:12px 0;padding:10px;background:#fff;border:1px solid #ccc}
-#boardWrap{display:none}
-button{font-size:16px;padding:8px 10px;margin:3px}
-table{border-collapse:collapse;margin:10px auto;touch-action:manipulation}
-td{padding:0}
-.cell{
-  width:30px;height:30px;
-  font-size:18px;font-weight:bold;
-  line-height:28px;
-  border:2px outset #cfcfcf;
-  background:#cfcfcf;
-}
-.open{border:1px solid #aaa;background:#ececec}
-.flag{color:#b00}
-.n1{color:#0000ff}.n2{color:#008000}.n3{color:#ff0000}.n4{color:#000080}
-.n5{color:#800000}.n6{color:#008080}.n7{color:#000000}.n8{color:#666666}
-</style>
+<title>Mine Game</title>
 </head>
 <body>
-<h1>Minesweeper</h1>
 
-<div id="status">Trying to run JavaScript...</div>
+<h3>MINESWEEPER</h3>
 
-<div id="boardWrap">
-  <div>
-    <button onclick="newGame(9,9,10)">Easy</button>
-    <button onclick="newGame(16,16,40)">Medium</button>
-    <button onclick="newGame(16,30,99)">Hard</button>
-  </div>
-  <div>
-    <button onclick="newGame(rows,cols,mines)">Restart</button>
-    <button id="modeBtn" onclick="toggleMode()">Mode: Reveal</button>
-  </div>
-  <div id="info">Mines: 10 | Time: 0</div>
-  <table id="board"></table>
-</div>
+<div id="info">Mines: 10</div>
+<div id="game"></div>
 
-<noscript>
-  <div style="margin-top:12px;padding:10px;background:#fff;border:1px solid #ccc">
-    JavaScript is disabled or unsupported in this browser, so the game cannot load.
-  </div>
-</noscript>
+<script type="text/javascript">
 
-<script>
-(function () {
-  var status = document.getElementById("status");
-  var boardWrap = document.getElementById("boardWrap");
+var W = 9;
+var H = 9;
+var M = 10;
+var board = [];
+var first = 1;
+var over = 0;
 
-  status.innerHTML = "JavaScript is running. Loading board...";
+function start() {
+    var x, y;
 
-  var rows = 9;
-  var cols = 9;
-  var mines = 10;
-  var grid = [];
-  var started = false;
-  var gameOver = false;
-  var flags = 0;
-  var time = 0;
-  var timer = null;
-  var mode = "reveal";
+    board = [];
 
-  function newGame(r, c, m) {
-    rows = r;
-    cols = c;
-    mines = m;
-    grid = [];
-    started = false;
-    gameOver = false;
-    flags = 0;
-    time = 0;
-    mode = "reveal";
+    for (y = 0; y < H; y++) {
+        board[y] = [];
 
-    if (timer !== null) {
-      clearInterval(timer);
-      timer = null;
-    }
-
-    document.getElementById("modeBtn").innerHTML = "Mode: Reveal";
-
-    for (var y = 0; y < rows; y++) {
-      grid[y] = [];
-      for (var x = 0; x < cols; x++) {
-        grid[y][x] = { mine:false, open:false, flag:false, n:0 };
-      }
-    }
-
-    drawBoard();
-    updateInfo();
-  }
-
-  function drawBoard() {
-    var board = document.getElementById("board");
-    var html = "";
-
-    for (var y = 0; y < rows; y++) {
-      html += "<tr>";
-      for (var x = 0; x < cols; x++) {
-        var c = grid[y][x];
-        var label = "";
-        var cls = "cell";
-
-        if (c.open) {
-          cls += " open";
-          if (c.mine) {
-            label = "*";
-          } else if (c.n > 0) {
-            label = String(c.n);
-            cls += " n" + c.n;
-          }
-        } else if (c.flag) {
-          label = "F";
-          cls += " flag";
+        for (x = 0; x < W; x++) {
+            board[y][x] = {
+                mine: 0,
+                open: 0,
+                number: 0
+            };
         }
-
-        html += '<td><button class="' + cls + '" onclick="clickCell(' + x + ',' + y + ')">' + label + "</button></td>";
-      }
-      html += "</tr>";
     }
 
-    board.innerHTML = html;
-  }
+    draw();
+}
 
-  function placeMines(sx, sy) {
-    var safe = [];
-    for (var y = 0; y < rows; y++) {
-      for (var x = 0; x < cols; x++) {
-        if (Math.abs(x - sx) <= 1 && Math.abs(y - sy) <= 1) continue;
-        safe.push([x, y]);
-      }
-    }
+function draw() {
+    var s = "";
+    var x, y, c, text;
 
-    for (var i = safe.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = safe[i];
-      safe[i] = safe[j];
-      safe[j] = t;
-    }
+    for (y = 0; y < H; y++) {
 
-    for (var k = 0; k < mines; k++) {
-      var p = safe[k];
-      grid[p[1]][p[0]].mine = true;
-    }
+        for (x = 0; x < W; x++) {
 
-    for (var yy = 0; yy < rows; yy++) {
-      for (var xx = 0; xx < cols; xx++) {
-        var count = 0;
-        for (var dy = -1; dy <= 1; dy++) {
-          for (var dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            var ny = yy + dy;
-            var nx = xx + dx;
-            if (ny >= 0 && ny < rows && nx >= 0 && nx < cols && grid[ny][nx].mine) {
-              count++;
+            c = board[y][x];
+
+            if (c.open) {
+
+                if (c.mine) {
+                    text = "*";
+                } else {
+                    text = c.number;
+                }
+
+            } else {
+                text = "#";
             }
-          }
+
+            s += "<input type=\"button\" value=\"" +
+                 text +
+                 "\" onclick=\"clickCell(" +
+                 x +
+                 "," +
+                 y +
+                 ")\">";
         }
-        grid[yy][xx].n = count;
-      }
-    }
-  }
 
-  function clickCell(x, y) {
-    if (gameOver) return;
-
-    var c = grid[y][x];
-
-    if (mode === "flag") {
-      toggleFlag(x, y);
-      return;
+        s += "<br>";
     }
 
-    if (c.open || c.flag) return;
+    document.getElementById("game").innerHTML = s;
+}
 
-    if (!started) {
-      placeMines(x, y);
-      started = true;
-      timer = setInterval(function () {
-        time++;
-        updateInfo();
-      }, 1000);
+function makeMines(sx, sy) {
+
+    var placed = 0;
+    var x, y;
+
+    while (placed < M) {
+
+        x = Math.floor(Math.random() * W);
+        y = Math.floor(Math.random() * H);
+
+        if (Math.abs(x - sx) <= 1 &&
+            Math.abs(y - sy) <= 1) {
+
+            continue;
+        }
+
+        if (!board[y][x].mine) {
+
+            board[y][x].mine = 1;
+            placed++;
+        }
+    }
+
+    for (y = 0; y < H; y++) {
+
+        for (x = 0; x < W; x++) {
+
+            board[y][x].number =
+                countMines(x, y);
+        }
+    }
+}
+
+function countMines(x, y) {
+
+    var n = 0;
+    var xx, yy;
+
+    for (yy = y - 1; yy <= y + 1; yy++) {
+
+        for (xx = x - 1; xx <= x + 1; xx++) {
+
+            if (xx >= 0 &&
+                xx < W &&
+                yy >= 0 &&
+                yy < H) {
+
+                if (board[yy][xx].mine) {
+                    n++;
+                }
+            }
+        }
+    }
+
+    return n;
+}
+
+function clickCell(x, y) {
+
+    var c;
+
+    if (over) {
+        return;
+    }
+
+    c = board[y][x];
+
+    if (c.open) {
+        return;
+    }
+
+    if (first) {
+
+        makeMines(x, y);
+        first = 0;
     }
 
     if (c.mine) {
-      c.open = true;
-      gameOver = true;
-      if (timer !== null) clearInterval(timer);
-      revealAllMines();
-      drawBoard();
-      updateInfo();
-      updateStatus("JavaScript works. Game over.");
-      setTimeout(function () { alert("Boom!"); }, 10);
-      return;
+
+        c.open = 1;
+        over = 1;
+
+        showMines();
+        draw();
+
+        document.getElementById("info").innerHTML =
+            "BOOM - RELOAD TO PLAY AGAIN";
+
+        return;
     }
 
-    floodReveal(x, y);
-    drawBoard();
-    updateInfo();
+    openArea(x, y);
 
-    if (checkWin()) {
-      gameOver = true;
-      if (timer !== null) clearInterval(timer);
-      updateStatus("JavaScript works. You won.");
-      setTimeout(function () { alert("You win! Time: " + time + " seconds"); }, 10);
+    draw();
+
+    if (won()) {
+
+        over = 1;
+
+        document.getElementById("info").innerHTML =
+            "YOU WIN!";
     }
-  }
+}
 
-  function floodReveal(x, y) {
-    var stack = [[x, y]];
+function openArea(x, y) {
 
-    while (stack.length > 0) {
-      var p = stack.pop();
-      var cx = p[0];
-      var cy = p[1];
-      var c = grid[cy][cx];
+    var list = [];
+    var p;
+    var xx;
+    var yy;
+    var c;
 
-      if (c.open || c.flag || c.mine) continue;
+    list.push([x, y]);
 
-      c.open = true;
+    while (list.length > 0) {
 
-      if (c.n === 0) {
-        for (var dy = -1; dy <= 1; dy++) {
-          for (var dx = -1; dx <= 1; dx++) {
-            var nx = cx + dx;
-            var ny = cy + dy;
-            if (nx >= 0 && nx < cols && ny >= 0 && ny < rows) {
-              if (!grid[ny][nx].open) stack.push([nx, ny]);
-            }
-          }
+        p = list.pop();
+
+        xx = p[0];
+        yy = p[1];
+
+        c = board[yy][xx];
+
+        if (c.open || c.mine) {
+            continue;
         }
-      }
+
+        c.open = 1;
+
+        if (c.number == 0) {
+
+            if (xx > 0) {
+                list.push([xx - 1, yy]);
+            }
+
+            if (xx < W - 1) {
+                list.push([xx + 1, yy]);
+            }
+
+            if (yy > 0) {
+                list.push([xx, yy - 1]);
+            }
+
+            if (yy < H - 1) {
+                list.push([xx, yy + 1]);
+            }
+        }
     }
-  }
+}
 
-  function toggleFlag(x, y) {
-    var c = grid[y][x];
-    if (c.open) return;
+function showMines() {
 
-    if (c.flag) {
-      c.flag = false;
-      flags--;
-    } else if (flags < mines) {
-      c.flag = true;
-      flags++;
+    var x, y;
+
+    for (y = 0; y < H; y++) {
+
+        for (x = 0; x < W; x++) {
+
+            if (board[y][x].mine) {
+                board[y][x].open = 1;
+            }
+        }
+    }
+}
+
+function won() {
+
+    var x, y;
+
+    for (y = 0; y < H; y++) {
+
+        for (x = 0; x < W; x++) {
+
+            if (!board[y][x].mine &&
+                !board[y][x].open) {
+
+                return 0;
+            }
+        }
     }
 
-    drawBoard();
-    updateInfo();
-  }
+    return 1;
+}
 
-  function toggleMode() {
-    if (mode === "reveal") {
-      mode = "flag";
-      document.getElementById("modeBtn").innerHTML = "Mode: Flag";
-    } else {
-      mode = "reveal";
-      document.getElementById("modeBtn").innerHTML = "Mode: Reveal";
-    }
-  }
+start();
 
-  function revealAllMines() {
-    for (var y = 0; y < rows; y++) {
-      for (var x = 0; x < cols; x++) {
-        if (grid[y][x].mine) grid[y][x].open = true;
-      }
-    }
-  }
-
-  function checkWin() {
-    for (var y = 0; y < rows; y++) {
-      for (var x = 0; x < cols; x++) {
-        if (!grid[y][x].mine && !grid[y][x].open) return false;
-      }
-    }
-    return true;
-  }
-
-  function updateInfo() {
-    document.getElementById("info").innerHTML = "Mines: " + (mines - flags) + " | Time: " + time;
-  }
-
-  function updateStatus(msg) {
-    status.innerHTML = msg;
-  }
-
-  window.newGame = newGame;
-  window.clickCell = clickCell;
-  window.toggleMode = toggleMode;
-
-  boardWrap.style.display = "block";
-  updateStatus("JavaScript is working. Board loaded.");
-  newGame(9, 9, 10);
-})();
 </script>
+
+<noscript>
+JavaScript is not working in this browser.
+</noscript>
+
 </body>
 </html>
