@@ -1,272 +1,170 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
 <head>
-<title>Mine Game</title>
-</head>
-<body>
+<title>Mini Minesweeper</title>
 
-<h3>MINESWEEPER</h3>
+<style type="text/css">
+body {
+    font-family: Arial;
+}
 
-<div id="info">Mines: 10</div>
-<div id="game"></div>
+table {
+    border-collapse: collapse;
+}
+
+td {
+    width:24px;
+    height:24px;
+    border:1px solid #888;
+    background:#ccc;
+    text-align:center;
+    font-weight:bold;
+    cursor:pointer;
+}
+</style>
 
 <script type="text/javascript">
 
-var W = 9;
-var H = 9;
-var M = 10;
-var board = [];
-var first = 1;
-var over = 0;
+var W = 8;
+var H = 8;
+var MINES = 10;
 
-function start() {
+var board = [];
+var revealed = [];
+
+function init() {
     var x, y;
 
-    board = [];
+    for (y=0;y<H;y++) {
+        board[y]=[];
+        revealed[y]=[];
+        for (x=0;x<W;x++) {
+            board[y][x]=0;
+            revealed[y][x]=0;
+        }
+    }
 
-    for (y = 0; y < H; y++) {
-        board[y] = [];
+    var m=0;
+    while(m<MINES){
+        x=Math.floor(Math.random()*W);
+        y=Math.floor(Math.random()*H);
+        if(board[y][x]!="M"){
+            board[y][x]="M";
+            m++;
+        }
+    }
 
-        for (x = 0; x < W; x++) {
-            board[y][x] = {
-                mine: 0,
-                open: 0,
-                number: 0
-            };
+    for(y=0;y<H;y++){
+        for(x=0;x<W;x++){
+
+            if(board[y][x]=="M") continue;
+
+            var n=0;
+            var dx,dy;
+
+            for(dy=-1;dy<=1;dy++){
+                for(dx=-1;dx<=1;dx++){
+                    var xx=x+dx;
+                    var yy=y+dy;
+
+                    if(xx>=0 && xx<W && yy>=0 && yy<H){
+                        if(board[yy][xx]=="M") n++;
+                    }
+                }
+            }
+
+            board[y][x]=n;
         }
     }
 
     draw();
 }
 
-function draw() {
-    var s = "";
-    var x, y, c, text;
+function draw(){
 
-    for (y = 0; y < H; y++) {
+    var html="<table>";
 
-        for (x = 0; x < W; x++) {
+    var x,y;
 
-            c = board[y][x];
+    for(y=0;y<H;y++){
 
-            if (c.open) {
+        html+="<tr>";
 
-                if (c.mine) {
-                    text = "*";
-                } else {
-                    text = c.number;
-                }
+        for(x=0;x<W;x++){
 
-            } else {
-                text = "#";
+            var text="";
+
+            if(revealed[y][x]){
+
+                if(board[y][x]=="M")
+                    text="*";
+                else if(board[y][x]>0)
+                    text=board[y][x];
+
             }
 
-            s += "<input type=\"button\" value=\"" +
-                 text +
-                 "\" onclick=\"clickCell(" +
-                 x +
-                 "," +
-                 y +
-                 ")\">";
+            html+='<td onclick="clickCell('+x+','+y+')">'+text+'</td>';
+
         }
 
-        s += "<br>";
+        html+="</tr>";
     }
 
-    document.getElementById("game").innerHTML = s;
+    html+="</table>";
+
+    document.getElementById("game").innerHTML=html;
 }
 
-function makeMines(sx, sy) {
+function reveal(x,y){
 
-    var placed = 0;
-    var x, y;
+    if(x<0||y<0||x>=W||y>=H) return;
+    if(revealed[y][x]) return;
 
-    while (placed < M) {
+    revealed[y][x]=1;
 
-        x = Math.floor(Math.random() * W);
-        y = Math.floor(Math.random() * H);
+    if(board[y][x]!=0) return;
 
-        if (Math.abs(x - sx) <= 1 &&
-            Math.abs(y - sy) <= 1) {
+    reveal(x-1,y-1);
+    reveal(x,y-1);
+    reveal(x+1,y-1);
 
-            continue;
-        }
+    reveal(x-1,y);
+    reveal(x+1,y);
 
-        if (!board[y][x].mine) {
-
-            board[y][x].mine = 1;
-            placed++;
-        }
-    }
-
-    for (y = 0; y < H; y++) {
-
-        for (x = 0; x < W; x++) {
-
-            board[y][x].number =
-                countMines(x, y);
-        }
-    }
+    reveal(x-1,y+1);
+    reveal(x,y+1);
+    reveal(x+1,y+1);
 }
 
-function countMines(x, y) {
+function clickCell(x,y){
 
-    var n = 0;
-    var xx, yy;
+    if(board[y][x]=="M"){
 
-    for (yy = y - 1; yy <= y + 1; yy++) {
+        var xx,yy;
 
-        for (xx = x - 1; xx <= x + 1; xx++) {
+        for(yy=0;yy<H;yy++)
+            for(xx=0;xx<W;xx++)
+                revealed[yy][xx]=1;
 
-            if (xx >= 0 &&
-                xx < W &&
-                yy >= 0 &&
-                yy < H) {
-
-                if (board[yy][xx].mine) {
-                    n++;
-                }
-            }
-        }
-    }
-
-    return n;
-}
-
-function clickCell(x, y) {
-
-    var c;
-
-    if (over) {
-        return;
-    }
-
-    c = board[y][x];
-
-    if (c.open) {
-        return;
-    }
-
-    if (first) {
-
-        makeMines(x, y);
-        first = 0;
-    }
-
-    if (c.mine) {
-
-        c.open = 1;
-        over = 1;
-
-        showMines();
         draw();
 
-        document.getElementById("info").innerHTML =
-            "BOOM - RELOAD TO PLAY AGAIN";
-
+        alert("Game Over");
         return;
     }
 
-    openArea(x, y);
-
+    reveal(x,y);
     draw();
-
-    if (won()) {
-
-        over = 1;
-
-        document.getElementById("info").innerHTML =
-            "YOU WIN!";
-    }
 }
-
-function openArea(x, y) {
-
-    var list = [];
-    var p;
-    var xx;
-    var yy;
-    var c;
-
-    list.push([x, y]);
-
-    while (list.length > 0) {
-
-        p = list.pop();
-
-        xx = p[0];
-        yy = p[1];
-
-        c = board[yy][xx];
-
-        if (c.open || c.mine) {
-            continue;
-        }
-
-        c.open = 1;
-
-        if (c.number == 0) {
-
-            if (xx > 0) {
-                list.push([xx - 1, yy]);
-            }
-
-            if (xx < W - 1) {
-                list.push([xx + 1, yy]);
-            }
-
-            if (yy > 0) {
-                list.push([xx, yy - 1]);
-            }
-
-            if (yy < H - 1) {
-                list.push([xx, yy + 1]);
-            }
-        }
-    }
-}
-
-function showMines() {
-
-    var x, y;
-
-    for (y = 0; y < H; y++) {
-
-        for (x = 0; x < W; x++) {
-
-            if (board[y][x].mine) {
-                board[y][x].open = 1;
-            }
-        }
-    }
-}
-
-function won() {
-
-    var x, y;
-
-    for (y = 0; y < H; y++) {
-
-        for (x = 0; x < W; x++) {
-
-            if (!board[y][x].mine &&
-                !board[y][x].open) {
-
-                return 0;
-            }
-        }
-    }
-
-    return 1;
-}
-
-start();
 
 </script>
 
-<noscript>
-JavaScript is not working in this browser.
-</noscript>
+</head>
+
+<body onload="init()">
+
+<h2>Minesweeper</h2>
+
+<div id="game"></div>
 
 </body>
 </html>
